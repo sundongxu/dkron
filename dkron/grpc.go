@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	metrics "github.com/armon/go-metrics"
@@ -41,8 +40,8 @@ type DkronGRPCServer interface {
 
 // GRPCServer is the local implementation of the gRPC server interface.
 type GRPCServer struct {
-	agent            *Agent
-	activeExecutions sync.Map
+	proto.DkronServer
+	agent *Agent
 }
 
 // NewGRPCServer creates and returns an instance of a DkronGRPCServer implementation
@@ -196,7 +195,7 @@ func (grpcs *GRPCServer) ExecutionDone(ctx context.Context, execDoneReq *proto.E
 	// Retrieve the fresh, updated job from the store to work on stored values
 	job, err = grpcs.agent.Store.GetJob(job.Name, nil)
 	if err != nil {
-		log.WithError(err).WithField("job", job.Name).Error("grpc: Error retrieving job from store")
+		log.WithError(err).WithField("job", execDoneReq.Execution.JobName).Error("grpc: Error retrieving job from store")
 		return nil, err
 	}
 
@@ -222,7 +221,7 @@ func (grpcs *GRPCServer) ExecutionDone(ctx context.Context, execDoneReq *proto.E
 		}, nil
 	}
 
-	exg, err := grpcs.agent.Store.GetExecutionGroup(execution)
+	exg, err := grpcs.agent.Store.GetExecutionGroup(execution, job.GetTimeLocation())
 	if err != nil {
 		log.WithError(err).WithField("group", execution.Group).Error("grpc: Error getting execution group.")
 		return nil, err
